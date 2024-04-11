@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http.Headers;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using ImGuiNET;
@@ -21,27 +22,13 @@ namespace Shaderer.src
 
         public ImFontPtr mainFont;
 
-        string vertCode = 
-        "#version 440 core\n\n" + 
-        "layout(location=0) in vec3 aPos;\n\n" +
-        "layout(location=1) in vec2 aUV;\n" +
-        "out vec2 pass_uv;\n" +
-        "uniform mat4 projection; \n" +
-        "uniform mat4 view; \n"+
-        "void main(){\n"+
-        "    gl_Position = projection * view * vec4(aPos, 1.0);\n" +
-        "    pass_uv = aUV;"+
-        "}\0"
-        ;
+        public string? currentSavePath = null;
 
-        string fragCode = 
-        "#version 440 core\n\n" +
-        "in vec2 pass_uv;\n" +
-        "out vec4 FragColour;\n\n" +
-        "void main(){\n"+
-        "   FragColour = vec4(0.0,0.3,0.6,1.0);\n" +
-        "}\0"
-        ;
+        string vertCode;
+
+        string fragCode;
+
+        Dictionary<string, int> icons = new Dictionary<string, int>();
 
         const int VIEWPORT_WIDTH = 800, VIEWPORT_HEIGHT = 450;
 
@@ -50,6 +37,8 @@ namespace Shaderer.src
         int shaderProgram = -1;
 
         List<string> errorList = new List<string>();
+
+        bool wireframeMode = false;
 
         
 
@@ -67,6 +56,10 @@ namespace Shaderer.src
         float camTime = 0f;
 
         bool animateCam;
+
+        bool showQuitWindow;
+
+        bool showAboutWindow;
 
         public Window(int width, int height, string title) : base(GameWindowSettings.Default, new NativeWindowSettings{ClientSize = new Vector2i(width, height), Title = title}){
             controller = new ImGuiController(width,height);
@@ -86,6 +79,37 @@ namespace Shaderer.src
             
             CenterWindow();
             Run();
+        }
+
+        public void LoadFile(string path){
+            if(File.Exists(path)){
+                JsonDocument file = JsonDocument.Parse(File.OpenRead(path));
+
+                JsonElement vert, frag;
+                if(file.RootElement.TryGetProperty("VertexCode", out vert)){
+                    Debug.WriteLine("vertex code found!");
+                    vertCode = vert.GetString();
+                }
+
+                if(file.RootElement.TryGetProperty("FragmentCode", out frag)){
+                    Debug.WriteLine("fragment code found!");
+                    fragCode = frag.GetString();
+                }
+
+                CompileShader();
+            }
+        }
+
+        public void SetWireframe(bool b){
+            wireframeMode = b;
+            if(wireframeMode){
+                GL.Disable(EnableCap.CullFace);
+                GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Line);
+            }
+            else{
+                GL.Enable(EnableCap.CullFace);
+                GL.PolygonMode(MaterialFace.FrontAndBack, PolygonMode.Fill);
+            }
         }
 
         public uint Color4ToUint(Color4 col){
@@ -132,6 +156,23 @@ namespace Shaderer.src
             GL.DeleteShader(fragment);
         }
 
+        public int LoadTexture(string path, bool flip_y, TextureMinFilter minFilter, TextureMagFilter magFilter){
+            int texID = GL.GenTexture();
+
+            GL.BindTexture(TextureTarget.Texture2D, texID);
+
+            StbImage.stbi_set_flip_vertically_on_load(flip_y? 1: 0);
+
+            ImageResult image = ImageResult.FromStream(File.OpenRead(path), ColorComponents.RedGreenBlueAlpha);
+
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, image.Width, image.Height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, image.Data);
+
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)minFilter);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)magFilter);
+
+            return texID;
+        }
+
         private void WindowText(TextInputEventArgs args)
         {
             controller.PressChar((char)args.Unicode);
@@ -167,10 +208,24 @@ namespace Shaderer.src
             syntaxTokens.Add("sampler2D", Color4ToUint(Color4.Cyan));
             syntaxTokens.Add("mat4", Color4ToUint(Color4.Cyan));
 
-            CompileShader();
+            //load icons
+            icons.Add("logo", LoadTexture("icons/logo.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("float", LoadTexture("icons/Float.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("int", LoadTexture("icons/Int.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("vec2", LoadTexture("icons/Vec2.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("vec3", LoadTexture("icons/Vec3.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("vec4", LoadTexture("icons/Vec4.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("mat3", LoadTexture("icons/Mat3.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("mat4", LoadTexture("icons/Mat4.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("texture", LoadTexture("icons/Texture.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("warning", LoadTexture("icons/warning.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+
+            LoadFile("exampleShaders/default.shader");
 
             GL.Enable(EnableCap.CullFace);
             GL.Enable(EnableCap.DepthTest);
+
+            SetWireframe(wireframeMode);
 
             viewport = new Viewport(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, Color4.CornflowerBlue);
 
@@ -208,15 +263,29 @@ namespace Shaderer.src
             if(ImGui.BeginMainMenuBar()){
                 if(ImGui.BeginMenu("File")){
                     if(ImGui.MenuItem("New Shader")){
-                        //create new shader
+                        vertCode = "";
+                        fragCode = "";
                     }
 
                     if(ImGui.MenuItem("Open Shader...")){
                         //open new shader
                     }
 
+                    if(ImGui.MenuItem("Save")){
+                        //save to file if a path already exists
+                    }
+
+                    if(ImGui.MenuItem("Save As...")){
+                        //save to a new path
+                    }
+
                     if(ImGui.MenuItem("Export Shader...")){
                         //Export to .vert and .frag
+                    }
+
+                    if(ImGui.MenuItem("Exit Shaderer...")){
+                        showQuitWindow = true;
+                        
                     }
 
                     ImGui.EndMenu();
@@ -231,6 +300,7 @@ namespace Shaderer.src
                 if(ImGui.BeginMenu("Help")){
                     if(ImGui.MenuItem("About Shaderer...")){
                         //spawn about window
+                        showAboutWindow = true;
                     }
                 }
             }
@@ -274,6 +344,10 @@ namespace Shaderer.src
                 if(ImGui.Button("Reset cam")){
                     camTime = 0f;
                     camPos.Y = 0f;
+                }
+
+                if(ImGui.Button("Wireframe: " + (wireframeMode? "ON" : "OFF"))){
+                    SetWireframe(!wireframeMode);
                 }
 
                 
@@ -324,11 +398,38 @@ namespace Shaderer.src
                 }
             }
 
+            if(showAboutWindow && ImGui.Begin("About Shaderer", ref showAboutWindow, ImGuiWindowFlags.NoDocking)){
+                ImGui.SetCursorPos(new System.Numerics.Vector2(ImGui.GetWindowWidth() / 2f - 50, ImGui.GetCursorPosY()));
+                ImGui.Image(icons["logo"], new System.Numerics.Vector2(100,100));
+                ImGui.NewLine();
+                ImGui.TextWrapped("Shaderer is a real-time GLSL editor I made in a few weeks. It uses OpenTK and DearIMGUI as backend.");
+                ImGui.TextWrapped("The project is open-source so feel free to inspect the code or add to it yourself!");
+                if(ImGui.Button("View the project on GitHub!")){
+                    Process p = new Process();
+                    p.StartInfo.FileName = "https://github.com/MatthewRoxby/Shaderer";
+                    p.StartInfo.UseShellExecute = true;
+                    p.Start();
+                }
+            }
+
+            if(showQuitWindow) ImGui.OpenPopup("Quit Confirmation");
+
+            if(ImGui.BeginPopupModal("Quit Confirmation", ref showQuitWindow, ImGuiWindowFlags.AlwaysAutoResize)){
+                ImGui.Text("Are you sure you want to quit?");
+                if(ImGui.Button("Yes")){
+                    Close();
+                }
+                
+                if(ImGui.Button("No")){
+                    showQuitWindow = false;
+                }
+            }
+
+            
+
             ImGui.PopFont();
 
             controller.Render();
-
-            
 
             SwapBuffers();
         }

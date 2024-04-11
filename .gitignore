@@ -3,5 +3,6 @@ bin/Debug/net8.0/*
 !bin/Debug/net8.0/icons
 !bin/Debug/net8.0/models
 !bin/Debug/net8.0/textures
+!bin/Debug/net8.0/exampleShaders
 obj/*
 .vscode/*
