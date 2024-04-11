@@ -210,15 +210,15 @@ namespace Shaderer.src
 
             //load icons
             icons.Add("logo", LoadTexture("icons/logo.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("float", LoadTexture("icons/Float.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("int", LoadTexture("icons/Int.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("vec2", LoadTexture("icons/Vec2.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("vec3", LoadTexture("icons/Vec3.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("vec4", LoadTexture("icons/Vec4.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("mat3", LoadTexture("icons/Mat3.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("mat4", LoadTexture("icons/Mat4.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("texture", LoadTexture("icons/Texture.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
-            icons.Add("warning", LoadTexture("icons/warning.png", true, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("float", LoadTexture("icons/Float.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("int", LoadTexture("icons/Int.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("vec2", LoadTexture("icons/Vec2.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("vec3", LoadTexture("icons/Vec3.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("vec4", LoadTexture("icons/Vec4.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("mat3", LoadTexture("icons/Mat3.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("mat4", LoadTexture("icons/Mat4.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("texture", LoadTexture("icons/Texture.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
+            icons.Add("warning", LoadTexture("icons/warning.png", false, TextureMinFilter.Nearest, TextureMagFilter.Nearest));
 
             LoadFile("exampleShaders/default.shader");
 
@@ -357,6 +357,8 @@ namespace Shaderer.src
                     ImGui.TextWrapped("COMPILATION ERRORS DETECTED");
 
                     foreach(string error in errorList){
+                        ImGui.Image(icons["warning"], new System.Numerics.Vector2(100,100));
+                        ImGui.SameLine();
                         ImGui.TextWrapped(error);
                     }
 
