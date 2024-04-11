@@ -1,0 +1,7 @@
+bin/Debug/net8.0/*
+!bin/Debug/net8.0/fonts
+!bin/Debug/net8.0/icons
+!bin/Debug/net8.0/models
+!bin/Debug/net8.0/textures
+obj/*
+.vscode/*
